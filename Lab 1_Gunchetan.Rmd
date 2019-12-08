@@ -1,0 +1,452 @@
+---
+title: "Lab 1_Gunchetan"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r pressure, echo=FALSE}
+library(ggplot2)
+
+```
+
+  
+```{r}
+getwd()
+```
+Let us load the plants data
+```{r}
+load(file = "plants.Rdata")
+```
+title: Analysis of US Power Generation
+
+One focus of your team is the emissions associated with electric power generation.
+Now that we have loaded the data, we will start the Exporatory Data Analysis based on our overarching objectives:
+
+ Allocation of resources
+ Regulations on dfferent technologies
+ Identifying opportunities for emissions reductions
+dataset that contains emissions characteristics of electric power plants in the
+US for 2010.
+
+```{r}
+Plants<- df
+class(Plants)
+head(Plants)
+```
+
+Now, we will have a look at the variables and no. of rows & columns in Plants data frame
+```{r}
+names(Plants)
+```
+
+```{r}
+dim(Plants)
+```
+So, we see that our data set has 5393 rows of plant data, each row corresponding to a particular plant. We also have 38 columns, each of which contains data for a variable
+
+Now, for the preparation section of our task, we will perform some calculations
+1) the first calculation is for Plant Capacity Factor (CapFac)
+The capacity factor of a power plant is the ratio of its actual output over a year, to its
+potential output if it were possible for it to operate at full nameplate capacity continuously
+over the same year. In the dataset, it could be calculate as follows: Plant Capacity Factor
+(CapFac) = (NetGen / (Capacity * 8760)).
+Reference:
+NetGen: Plant Annual Net Generation
+Capacity: Plant Nameplate Capacity
+```{r}
+NetGen <- c(Plants$NetGen)
+Capacity<- c(Plants$Capacity)
+#Using the folrmula for Capacity Factor
+CapFac <- c(NetGen / (Capacity*8760))
+#now we add this to the Plants data frame under the column CapFac
+Plants$CapFac <- CapFac
+```
+Let's do a histogram for CapFac
+```{r}
+hist(Plants$CapFac)
+```
+The above data shows that a vast majority of the plants are used below their capacity factor.
+
+2) Plant Nominal Heat Rate (HeatRate):
+For combustion plants, the heat rate quantifies how efficiently the primary fuel is converted to
+electric energy. It is calculated as follows: For combustion plants (Combust = 1), HeatRate
+= 1000 * (HeatInput / NetGen). For partial combustion plants (Combust = 0.5), HeatRate
+= 1000 * (HeatInput / CombGen).
+Reference:
+HeatInput: Plant Annual Heat Input
+NetGen: Plant Annual Net Generation
+CombGen: Plant Annual Total Combustion Net Generation
+
+Let's look at the distribution of plants based on combustion
+```{r}
+hist(Plants$Combust)
+```
+For combustion plants, the heat rate quantifies how efficiently the primary fuel is converted to
+electric energy. It is calculated as follows: For combustion plants (Combust = 1), HeatRate
+= 1000 * (HeatInput / NetGen). For partial combustion plants (Combust = 0.5), HeatRate
+= 1000 * (HeatInput / CombGen).
+
+
+```{r}
+#Here we have to calculate values using two formulas in a single new column based on the value of that row under the Combust column
+
+Indices_Plants_Combust = Plants$Combust == 1 #row numbers of full combustion plants
+Indices_Plants_PartCombust = Plants$Combust == 0.5 #row numbers of partial combustion plants
+Plants[Indices_Plants_Combust,"HeatRate"] <- 1000*(Plants[Indices_Plants_Combust,"HeatInput"] / Plants[Indices_Plants_Combust,"NetGen"]) # We just calculated heat rate for all plants that have combust = 1
+
+Plants[Indices_Plants_PartCombust,"HeatRate"] <- 1000*(Plants[Indices_Plants_PartCombust,"HeatInput"] / Plants[Indices_Plants_PartCombust,"CombGen"])
+```
+
+
+3) Annual Output Emission Rate for different pollutants:
+For combustion plants, the emissions rate quantities how much gas pollutants are generated
+per unit electricity generation. For example, for Plant Annual SO2 Output Emission
+Rate (SO2Rate), we have SO2Rate = 2000 * (SO2 / NetGen). NetGen is always the
+denominator for calculation.
+Reference:
+SO2: Plant Annual SO2 Emissions
+NetGen: Plant Annual Net Generation
+
+```{r}
+SO2 <- Plants$SO2
+#let's check the SO2 values for combustion
+hist(Plants$SO2)
+plot(Plants$Combust, Plants$SO2)
+#From the plot we see that plants with combustion have SO2
+```
+Now, we do the calculation for all the columns
+```{r}
+Plants$SO2Rate <- 2000 * (Plants$SO2 / Plants$NetGen)
+Plants$CO2Rate <- 2000 * (Plants$CO2 / Plants$NetGen)
+Plants$NOXRate <- 2000 * (Plants$NOX / Plants$NetGen)
+
+```
+
+
+Now, we compute the fraction of US electricity that is generated from combustion plants, and justify why it
+is thus important to characterize and understand the emissions associated with combustion plants. 
+
+```{r}
+#to calculate the portion of total energy generated from combustion plants, we will divide Total Combgen by Total NetGen
+Portion_Comb <- sum(Plants$CombGen) / sum(Plants$NetGen)
+Portion_Comb
+
+Plants$Check <- Plants$CombGen - Plants$NetGen
+```
+
+So, we get 71.5% of total energy is generated through combustion.
+
+Now, we need to remove all non-combustion plants. So, we create a sub-table or new data frame consisting of only combustion plants and partial combustion plants
+```{r}
+
+Plants_Comb <- subset(Plants, Plants$Combust > 0)
+
+hist(Plants_Comb$Combust)
+table(Plants_Comb$Combust)
+```
+First, we see that there is a very small number of plants (71) that are partial combustion compared to 3233 Total combustion plants
+
+Now, we calculate the fraction of power from partial combustion plants from the total from Partial combustion and total combustion
+```{r}
+Portion_part_Comb <- sum(subset(Plants_Comb$NetGen, Plants_Comb$Combust == 0.5)) / sum(subset(Plants_Comb$NetGen, Plants_Comb$Combust == 1))
+Portion_part_Comb
+```
+
+
+So, only 2.95% of the total energy through combustion plants is from Partial combustion plants. Therefore, it is safe to eliminate them from our analysis.
+
+The following command now creates a copy of our table containing only Full Combustion plants
+
+```{r}
+Plants_Comb_Only <- subset(Plants_Comb, Plants_Comb$Combust ==1)
+table(Plants_Comb_Only$Combust)
+```
+
+As we can see, All the plants in the new table Plants_Comb_Only are full combustion plants. We will now use this to conduct our full analysis.
+Each plant is indicated by a primary fuel source, but there still may be smaller portions of generation associated with other fuels. We will now Perform an analysis to show that the primary fuel source is a large fraction for large percentage of plants.
+
+The Primary fuel is provided in the FuelCat column and is divided based on maximum net generation the plant generates. Possible values are based on the 11 that are used for resource mix: COAL, OIL, GAS, NUCLEAR, HYDRO, BIOMASS, WIND, SOLAR, GEOTHERMAL, OTHRFOSL, and WSTHTOTPUR (Other Unknown/Purchased/Waste Heat).
+
+```{r}
+counts <- table(Plants_Comb_Only$FuelCat)
+barplot(counts, xlab = 'Primary Fuel Type', ylab = 'Number of Plants')
+counts
+```
+
+
+As we can see, the Primary fuels of BioMass, Coal, Gas and Oil make up a large percentage of the total combustion plants. It thus is reasonable to study the data by groups of primary fuel category, keeping the small fraction of mixed fuel sources in mind.
+
+
+We now have full combustion plants. Each plant is indicated by a primary fuel source, but there are still smaller portions of generation associated with other fuels. We will now perform an analysis to show that the primary fuel source is a large fraction for large percentage of plants. It thus is reasonable to study the data by groups of primary fuel category, keeping the small fraction of mixed fuel sources
+in mind.
+
+```{r}
+#making subset of coal plants
+Plants_Comb_Only_Coal <- subset(Plants_Comb_Only, Plants_Comb_Only$FuelCat == "COAL")
+
+#making subset of Gas Plants
+Plants_Comb_Only_Gas <- subset(Plants_Comb_Only, Plants_Comb_Only$FuelCat == "GAS")
+
+#making subset of Oil Plants
+Plants_Comb_Only_Oil <- subset(Plants_Comb_Only, Plants_Comb_Only$FuelCat == "OIL")
+
+#making subset of Biomass Plants
+Plants_Comb_Only_Biomass <- subset(Plants_Comb_Only, Plants_Comb_Only$FuelCat == "BIOMASS")
+
+#making subset of Other Fossil Fuel Plants
+Plants_Comb_Only_OTHRFOSL <- subset(Plants_Comb_Only, Plants_Comb_Only$FuelCat == "OTHRFOSL")
+
+#making subset of WSTHTOTPUR Plants
+Plants_Comb_Only_WSTHTOTPUR <- subset(Plants_Comb_Only, Plants_Comb_Only$FuelCat == "WSTHTOTPUR")
+
+#making a plot showing the proportion of energy fom the primary fuel for the Coal plants
+Plants_Comb_Only_Coal$PrimaryPercent <- (Plants_Comb_Only_Coal$CoalGen / Plants_Comb_Only_Coal$NetGen) * 100
+hist(Plants_Comb_Only_Coal$PrimaryPercent, main = "Percent of Generation from Primary Fuel (Coal)") 
+
+#making a plot showing the proportion of energy fom the primary fuel for the Gas plants
+Plants_Comb_Only_Gas$PrimaryPercent <- (Plants_Comb_Only_Gas$GasGen / Plants_Comb_Only_Gas$NetGen) * 100
+hist(Plants_Comb_Only_Gas$PrimaryPercent, main = "Percent of Generation from Primary Fuel (Gas)")
+
+#making a plot showing the proportion of energy fom the primary fuel for the Oil plants
+Plants_Comb_Only_Oil$PrimaryPercent <- (Plants_Comb_Only_Oil$OilGen / Plants_Comb_Only_Oil$NetGen) * 100
+hist(Plants_Comb_Only_Oil$PrimaryPercent, main = "Percent of Generation from Primary Fuel (Oil)")
+
+#making a plot showing the proportion of energy fom the primary fuel for the Biomass plants
+Plants_Comb_Only_Biomass$PrimaryPercent <- (Plants_Comb_Only_Biomass$BiomassGen / Plants_Comb_Only_Biomass$NetGen) * 100
+hist(Plants_Comb_Only_Biomass$PrimaryPercent, main = "Percent of Generation from Primary Fuel (Biomass)")
+
+```
+
+Based on the above, we can see that the majority (close to 100%) of power is indeed producecd by the primary fuel. Therefore, we can study the data by groups of primary fuel category, keeping the small fraction of mixed fuel sources
+in mind.
+
+
+Now, we will characterize emissions and performance of plants.
+We start this by analysing emissions by fuel type to understand if there is any coorelation.
+There are three types of emissions:
+CO2, SO2 and NOX
+
+
+```{r}
+#Plotting emissions by fuel type
+#First, we group by Fuel types
+ggplot(Plants_Comb_Only, aes(FuelCat, CO2)) + geom_col() + labs (x= "Fuel Category", y = "CO2 Equiv. Annual Emissions")
+ggplot(Plants_Comb_Only, aes(FuelCat, SO2)) + geom_col() + labs (x= "Fuel Category", y = "SO2 Equiv. Annual Emissions")
+ggplot(Plants_Comb_Only, aes(FuelCat, NOX)) + geom_col() + labs (x= "Fuel Category", y = "NOX Equiv. Annual Emissions")
+```
+As we can see, Most of the emissions are associated with coal powered power plants, followed by Gas powered plants. However, this may also be because most of the power plants in US are either coal powered or Gas powered. Therefore, it would be prudent to check emissions vs power generated.
+
+First, we will plot Net power generated by Fuel Category
+```{r}
+ggplot(Plants_Comb_Only, aes(FuelCat, NetGen)) + geom_col() + labs (x= "Fuel Category", y = "Net Power Generated")
+
+```
+As we can see, total power generation is higher for coal plants than any other fuel category. So, perhaps coal has more energy per plant. Let us try to analyze that as well.
+
+```{r}
+
+ggplot(Plants_Comb_Only, aes(FuelCat, NetGen)) + geom_boxplot() + labs (x= "Fuel Category", y = "Net Power Generated")
+
+```
+From this boxplot, we can see that the mean power generated per plant from Coal is much higher than the other plants. So, we can expect that Coal would have more emissions as well.
+We also see that there are a lot of outliers who have far higher power generated than the other plants. We now need to see where these platns are located. The filter would be plants generating more than 10^7
+```{r}
+Plants_HighPower <- subset(Plants_Comb_Only, Plants_Comb_Only$NetGen > 10^7)
+Plants_HighPower_Coal <- subset(Plants_HighPower, Plants_HighPower$FuelCat == "COAL")
+HighGen_State_counts <- table(Plants_HighPower_Coal$State)
+barplot(HighGen_State_counts, xlab = 'State', ylab = 'Number of High Power Coal Plants')
+
+```
+Here, we can see that Texas has the most High generation Coal plants, followed by Ohio and Florida. Let us see if this has any impact on the CO2 emissions per state
+
+```{r}
+#Let us also plot the CO2 emissions across different states
+ggplot(Plants_Comb_Only, aes(State, CO2)) + geom_col() + labs(x= "State", y = "Total CO2 equiv.")
+
+```
+As we can see, Texas has the most CO2 emissions among all the states followed by Ohio and Florida. This could be related to the high number of Coal generation plants and the high number of high power Coal generation plants.
+
+
+Then, we will plot Power generated (NetGen) vs CO2, SO2, NOX emissions
+```{r}
+ggplot(Plants_Comb_Only, aes(x = NetGen, y = CO2, color = FuelCat)) + geom_point() + ggtitle("Total Emissions vs Net Generation vs. type of Primary Fuel")
+ggplot(Plants_Comb_Only, aes(x = NetGen, y = SO2, color = FuelCat)) + geom_point() + ggtitle("Total Emissions vs Net Generation vs. type of Primary Fuel")
+ggplot(Plants_Comb_Only, aes(x = NetGen, y = NOX, color = FuelCat)) + geom_point() + ggtitle("Total Emissions vs Net Generation vs. type of Primary Fuel")
+```
+
+There are a few insights that we can see. 
+First, there seem to be many plants that generate more CO2 for the same Net Generation than other plants. There also seem to be two trend lines for CO2 emissions for power plants. This is clearly the trendline for Coal generated plants and the trendline for Gas powered plants. As we can see, Gas plants have far less emissions for the same amount of power. We will verify this when we do the plots for each individual power source.
+However, we do not see much insight from the NOX and So2 plots.
+
+Let us compare the emissions rate vs the heat rate of plants. This way we can compare different primary power sources in terms of emissions.
+However, This data plaot has some outliers that need to be removed to get some insight into the plots. So, removing outliers:
+
+```{r}
+#removing the outliers with CO2 emissions rate > 6000
+Plants_Comb_Only_RemoveOutliers <- subset(Plants_Comb_Only, Plants_Comb_Only$CO2Rate <= 6000 & Plants_Comb_Only$HeatRate <= 50000)
+
+ggplot(Plants_Comb_Only_RemoveOutliers, aes(FuelCat, CO2Rate)) + geom_boxplot() + ggtitle("Emissions (lbs/MWh) vs FuelCat")
+
+ggplot(Plants_Comb_Only_RemoveOutliers, aes(x = HeatRate, y = CO2Rate, color = FuelCat)) + geom_point() + ggtitle("Emissions (lbs/MWh) vs Heat Rate")
+
+ggplot(Plants_Comb_Only_RemoveOutliers, aes(x = HeatRate, y = SO2Rate, color = FuelCat)) + geom_point() + ggtitle("Emissions (lbs/MWh) vs Heat Rate")
+
+ggplot(Plants_Comb_Only_RemoveOutliers, aes(x = HeatRate, y = NOXRate, color = FuelCat)) + geom_point() + ggtitle("Emissions (lbs/MWh) vs Heat Rate")
+
+```
+
+Based on the above plot, we can see that as the heat rate increases, the emissions also increase. This is porbably because we are inputting more heat to get the same Net Generation, so we are losing more heat to waste. From this, we can say that low efficiency leads to higher emissions.
+
+Let us compare the emissions rate vs the capacity factor of plants. This way we can compare different primary power sources in terms of emissions.
+However, This data plot has some outliers that need to be removed to get some insight into the plots. So, removing outliers:
+
+```{r}
+
+ggplot(Plants_Comb_Only_RemoveOutliers, aes(x = CapFac, y = CO2Rate, color = FuelCat)) + geom_point() + ggtitle("Emissions (lbs/MWh) vs Capacity Factor")
+
+ggplot(Plants_Comb_Only_RemoveOutliers, aes(x = CapFac, y = SO2Rate, color = FuelCat)) + geom_point() + ggtitle("Emissions (lbs/MWh) vs Capacity Factor")
+
+ggplot(Plants_Comb_Only_RemoveOutliers, aes(x = CapFac, y = NOXRate, color = FuelCat)) + geom_point() + ggtitle("Emissions (lbs/MWh) vs Capacity Factor")
+
+```
+
+Based on the above plot, we can see that as the emissions generally remain the same with increasing capacity factors. This is porbably because we are higher capcity factor plants are also high net generation plants, so the efficiency gained is cancelled out by the sheer mass of emissions. We also see that for the same capacity factor, Biomass tends to have higher emissions than coal, which has higher emissions than Gas.
+
+
+Let us now look at specific fuel categories and try to find other drivers for emissions
+
+1. Coal Plants
+```{r}
+
+#plotting CO2 emissions vs Power
+ggplot(Plants_Comb_Only_Coal, aes(NetGen, CO2)) + geom_point() + ggtitle("Total CO2 emissions vs Net Generation of power plant")
+
+#Plotting CO2 emissions vs BIT, SUB, LIG and WC types of Coal
+ggplot(Plants_Comb_Only_Coal, aes(Fuel, CO2)) + geom_boxplot() + ggtitle("Total CO2 emissions vs Type of Coal Used")
+
+#Combining the above two graphs
+ggplot(Plants_Comb_Only_Coal, aes(x = NetGen, y = CO2, color = Fuel)) + geom_point() + ggtitle("Total CO2 emissions vs Net Generation vs Type of Coal")
+
+```
+An important insight from this plot is that Lignit Coal seems to have the highest CO2 emissions as compare to Bitumen. However, once again this could be because there are more Lignit coal plants. So, We need to divide the emissions with the energy generated and plot that for different types for plants.However, we see a few outlier plants that are way out of scale. We should probably look into these plant. After checking the dataset, we see that same outlier is way out of scale for all types of emissions. So, we will disregard this outlier to see any relation between types of coal used in a plant vs emissions. We will iteratively eliminate outliers to get a good spread of our boxplot.
+
+```{r}
+#making a sub dataset without outlier
+Plants_Comb_Only_Coal2 <- subset(Plants_Comb_Only_Coal, Plants_Comb_Only_Coal$CO2pergen <= 6000)
+
+#Plotting CO2 emissions vs BIT, SUB, LIG and WC types of Coal
+ggplot(Plants_Comb_Only_Coal2, aes(Fuel, CO2Rate)) + geom_boxplot() + ggtitle("Emissions (lbs/MWh) vs Fuel Type")
+
+#Plotting SO2 emissions vs BIT, SUB, LIG and WC types of Coal
+ggplot(Plants_Comb_Only_Coal2, aes(Fuel, SO2Rate)) + geom_boxplot() + ggtitle("Emissions (lbs/MWh) vs Fuel Type")
+
+#Plotting NOX emissions vs BIT, SUB, LIG and WC types of Coal
+ggplot(Plants_Comb_Only_Coal2, aes(Fuel, NOXRate)) + geom_boxplot() + ggtitle("Emissions (lbs/MWh) vs Fuel Type")
+
+```
+
+So, now that we look at the emissions per energy generated, we see that Bituminous coal plants have more SO2 and NOX emissions per unit of energy generated than Lignit coal, while having less CO2 emissions than Lignite. So, type of coal is definitely a factor in the emissions.
+
+Let us also try and plot the type of coal vs heat rate:
+
+```{r}
+#Plotting Heat Rate vs BIT, SUB, LIG and WC types of Coal
+ggplot(Plants_Comb_Only_Coal2, aes(Fuel, HeatRate)) + geom_boxplot() + ggtitle("Heat Rate vs Fuel Type")
+
+```
+
+We do not see much of a difference here as there are too many outliers for heatrates for a specifc coal type.
+
+
+Let us now look at specific fuel categories and try to find drivers for emissions
+2. Gas Plants
+```{r}
+
+#plotting CO2 emissions vs Power
+ggplot(Plants_Comb_Only_Gas, aes(NetGen, CO2)) + geom_point() + ggtitle("Total CO2 emissions vs Net Generation of power plant")
+
+#Fuel distribution
+ggplot(Plants_Comb_Only_Gas, aes(Fuel, NetGen)) + geom_col() + labs(x= "Type of Gas used", y = "Total Energy")
+
+#Combining the above two graphs
+ggplot(Plants_Comb_Only_Gas, aes(x = NetGen, y = CO2, color = Fuel)) + geom_point() + ggtitle("Total CO2 emissions vs Net Generation vs Type of Gas")
+
+```
+An important insight from these plots is that almost all gas plants used Natural Gas as their fuel, so unlike the coal plants, we do not need to analyze the distribution of emissions based on type of Gas.However, we do see that total CO2 emitted increases with increase in power generated by a plant, which is to be expected.
+
+3. Oil Plants
+```{r}
+
+#plotting CO2 emissions vs Power
+ggplot(Plants_Comb_Only_Oil, aes(NetGen, CO2)) + geom_point() + ggtitle("Total CO2 emissions vs Net Generation of power plant")
+
+#Fuel distribution
+ggplot(Plants_Comb_Only_Oil, aes(Fuel, NetGen)) + geom_col() + labs(x= "Type of Oil used", y = "Total Energy")
+
+#Combining the above two graphs
+ggplot(Plants_Comb_Only_Oil, aes(x = NetGen, y = CO2, color = Fuel)) + geom_point() + ggtitle("Total CO2 emissions vs Net Generation vs Type of Oil")
+
+```
+An important insight from these plots is that there seems to be a significant spread of fuel used among various plants contributing to total power mix. So, we will analyze if there is some significance in the CO2 emissions rate per type of fuel. There also seem to be a few outliers which we need to ignore to analyze the data.
+
+```{r}
+#making a sub dataset without outlier
+Plants_Comb_Only_Oil2 <- subset(Plants_Comb_Only_Oil, Plants_Comb_Only_Oil$CO2Rate <= 20000)
+
+#Plotting CO2 emissions vs types of oil
+ggplot(Plants_Comb_Only_Oil2, aes(Fuel, CO2Rate)) + geom_boxplot() + ggtitle("Emissions (lbs/MWh) vs Fuel Type")
+
+#Plotting SO2 emissions vs types of oil
+ggplot(Plants_Comb_Only_Oil2, aes(Fuel, SO2Rate)) + geom_boxplot() + ggtitle("Emissions (lbs/MWh) vs Fuel Type")
+
+#Plotting NOX emissions vs types of oil
+ggplot(Plants_Comb_Only_Oil2, aes(Fuel, NOXRate)) + geom_boxplot() + ggtitle("Emissions (lbs/MWh) vs Fuel Type")
+
+
+```
+
+From the above plots, we see that there is a huge variety of generators run by Diesel oil that have vastly different emission patterns. As they fom a substantial portion of the energy mix, we should target this category of fuels through future policy decisions.
+
+4. Lastly, we check the above for Biomass fuels as well:
+
+```{r}
+
+#plotting CO2 emissions vs Power
+ggplot(Plants_Comb_Only_Biomass, aes(NetGen, CO2)) + geom_point() + ggtitle("Total CO2 emissions vs Net Generation of power plant")
+
+#Fuel distribution
+ggplot(Plants_Comb_Only_Biomass, aes(Fuel, NetGen)) + geom_col() + labs(x= "Type of Biomass used", y = "Total Energy")
+
+#Combining the above two graphs
+ggplot(Plants_Comb_Only_Biomass, aes(x = NetGen, y = CO2, color = Fuel)) + geom_point() + ggtitle("Total CO2 emissions vs Net Generation vs Type of Biomass")
+
+```
+
+We see that the majority of Biomass energy mix is by 4 types of Biomass - Black Liquor, Landfill Gas, Municipal Solid Waste Biomass and Wood.
+Out of these Landfill Gas and Municipal Solid waste generate the most CO2.
+So, we closely analyze all emissions within the different types of Biomass:
+```{r}
+#making a sub dataset without outlier
+Plants_Comb_Only_Biomass2 <- subset(Plants_Comb_Only_Biomass, Plants_Comb_Only_Biomass$CO2Rate <= 5000)
+
+#Plotting CO2 emissions vs types of Biomass
+ggplot(Plants_Comb_Only_Biomass2, aes(Fuel, CO2Rate)) + geom_boxplot() + ggtitle("Emissions (lbs/MWh) vs Fuel Type")
+
+#Plotting SO2 emissions vs types of Biomass
+ggplot(Plants_Comb_Only_Biomass2, aes(Fuel, SO2Rate)) + geom_boxplot() + ggtitle("Emissions (lbs/MWh) vs Fuel Type")
+
+#Plotting NOX emissions vs types of Biomass
+ggplot(Plants_Comb_Only_Biomass2, aes(Fuel, NOXRate)) + geom_boxplot() + ggtitle("Emissions (lbs/MWh) vs Fuel Type")
+```
+From the above, we can clearly see that MSB is the biggest culprit in high CO2, SO2 and NOX emissions
+
+
+
+
+
